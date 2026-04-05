@@ -1,0 +1,53 @@
+# Ultralytics YOLO 🚀, AGPL-3.0 license
+# YOLOv8m object detection model with P2-P5 outputs.
+
+# Parameters
+nc: 5  # number of classes
+scales:
+  m: [0.67, 0.75, 768]   # YOLOv8m scale
+
+# YOLOv8.0m backbone
+backbone:
+  # [from, repeats, module, args]
+  - [-1, 1, Conv, [64, 3, 2]]   # 0-P1/2
+  - [-1, 1, Conv, [128, 3, 2]]  # 1-P2/4
+  - [-1, 2, C2f, [128, True]]    # 2
+  - [-1, 1, Conv, [256, 3, 2]]  # 3-P3/8
+  - [-1, 2, C2f, [256, True]]    # 4
+  - [-1, 1, Conv, [512, 3, 2]]  # 5-P4/16
+  - [-1, 2, C2f, [512, True]]    # 6
+  - [-1, 1, Conv, [768, 3, 2]]  # 7-P5/32 (注意: m尺度max_channels=768)
+  - [-1, 1, C2f, [768, True]]    # 8
+  - [-1, 1, SPPF, [768, 5]]     # 9
+
+# YOLOv8.0m head with P2 layer
+head:
+  # 上采样路径
+  - [-1, 1, nn.Upsample, [None, 2, 'nearest']]  # 10
+  - [[-1, 6], 1, Concat, [1]]   # 11 cat backbone P4
+  - [-1, 2, C2f, [512]]         # 12
+
+  - [-1, 1, nn.Upsample, [None, 2, 'nearest']]  # 13
+  - [[-1, 4], 1, Concat, [1]]   # 14 cat backbone P3
+  - [-1, 2, C2f, [256]]         # 15 (P3/8-small)
+
+  # 新增P2分支
+  - [-1, 1, nn.Upsample, [None, 2, 'nearest']]  # 16
+  - [[-1, 2], 1, Concat, [1]]   # 17 cat backbone P2 (第2层)
+  - [-1, 2, C2f, [128]]         # 18 (P2/4-extra small)
+
+  # 下采样路径 - 重新设计避免索引冲突
+  - [-1, 1, Conv, [256, 3, 2]]  # 19 P2->P3
+  - [[-1, 15], 1, Concat, [1]]  # 20 cat with P3 (第15层)
+  - [-1, 2, C2f, [256]]         # 21 (P3/8-small)
+
+  - [-1, 1, Conv, [512, 3, 2]]  # 22 P3->P4
+  - [[-1, 12], 1, Concat, [1]]  # 23 cat with P4 (第12层)
+  - [-1, 2, C2f, [512]]         # 24 (P4/16-medium)
+
+  - [-1, 1, Conv, [768, 3, 2]]  # 25 P4->P5
+  - [[-1, 9], 1, Concat, [1]]   # 26 cat with P5 (第9层)
+  - [-1, 2, C2f, [768]]         # 27 (P5/32-large)
+
+  # 检测层 - 使用4个输出层
+  - [[18, 21, 24, 27], 1, Detect, [nc]]  # Detect(P2, P3, P4, P5)

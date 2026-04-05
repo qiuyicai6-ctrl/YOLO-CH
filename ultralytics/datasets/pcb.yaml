@@ -1,0 +1,12 @@
+path: "C:\\Users\\86156\\Desktop\\PCB\\DATA\\data3"  # dataset root dir
+train: "C:\\Users\\86156\\Desktop\\PCB\\DATA\\data3\\train"  # train images (relative to 'path') 128 images
+val: "C:\\Users\\86156\\Desktop\\PCB\\DATA\\data3\\valid"  # val images (relative to 'path') 128 images
+#test:  # test images (optional)
+
+# Classes
+names:
+  0: Continuous welding
+  1: Less welding
+  2: Spike
+  3: Over welding
+  4: good

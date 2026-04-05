@@ -1,0 +1,14 @@
+# PCB焊点检测数据集配置
+path: "C:\Users\86156\Desktop\PCB\DATA\data3"  # dataset root dir
+train: train  # train images (relative to 'path')
+val: valid    # val images (relative to 'path')
+#test:        # test images (optional)
+
+# Classes
+nc: 5  # number of classes
+names: 
+  0: "Continuous welding"
+  1: "Less welding" 
+  2: "Spike"
+  3: "Over welding"
+  4: "good"
