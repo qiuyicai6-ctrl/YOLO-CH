@@ -1,129 +1,48 @@
 # YOLOv8-model-improvement
 ## 目录
 - [项目基本介绍](#项目基本介绍)
-- [启动前后端交互系统](#启动前后端交互系统)
+- [YOLO-CH核心改进](#yolo-ch核心改进)
+- [实验结果（论文数据）](#实验结果论文数据)
 - [如何训练自己的数据集](#如何训练自己的数据集)
 ## 项目基本介绍
 本项目对著名的YOLOv8模型进行了多角度的改进优化，并在特定数据集上实现了精度的上涨
 
-采用改进版本的YOLOv8模型与两个表现优良的跟踪器结合(botsort和bytetrack)
-
-基于Vue和Flask开发了一个目标跟踪算法展示平台,平台提供了图像检测和视频跟踪两种功能
-
-视频跟踪实现了在两种应用场景下简单功能（逆行检测和球员轨迹分析）
+本项目完整实现了论文《基于YOLO-CH的PCB板焊点缺陷检测算法》中的改进模型，在YOLOv8基础上提出了**YOLO-CH**算法，通过三项创新有效解决了PCB焊点检测中小目标特征易丢失、检测精度低以及模型参数量过多的问题。
+- **P2高分辨率检测层**：将下采样倍数降至4倍，结合渐进式特征融合与双向特征交互，保留焊点小目标的纹理、边缘等关键细节。
+- **CECA双阶段注意力模块**：“先通道选择、后位置精调”的级联策略，增强小目标特征表示能力，保持轻量化。
+- **三维复合加权损失函数**：融合面积‑形状‑区域权重，针对性提升小目标损失占比，缓解大小目标优化不平衡。
 ### YOLOv8目标检测组合优化改进（成功涨点）:
 
-#### 1、添加GAM注意力机制；
-添加部位为backbone：
+### 1. P2高分辨率检测层
+在YOLOv8原有FPN+PAN基础上，新增P2检测层（4倍下采样特征图）。相比原P3层（8倍下采样），分辨率提高4倍，有效保留焊点小目标的纹理、边缘与轮廓信息。采用**渐进式特征融合**与**双向特征交互**策略，先上采样再与原始高分辨率特征融合，避免浅层语义信息不足的问题。
 
-![image](https://github.com/Zwc2003/YOLOv8-model-improvement/assets/126054446/63bd8895-5085-4010-bbea-98d37de0ed92)
+### 2. CECA双阶段注意力模块
+将颈部中的标准Conv模块替换为CECA模块，采用“先通道选择，后位置精调”的级联策略：
+- **通道注意力阶段**：使用一维卷积（核大小K=3）取代传统全连接层，捕获通道间局部依赖关系，计算量小且避免信息损失。
+- **坐标注意力阶段**：沿水平和垂直方向池化并生成位置敏感权重，在P2层提供的高分辨率特征图上精细定位焊点区域。
 
+CECA模块显著提升了小目标的可辨识性，抑制背景干扰。
 
+### 3. 三维复合加权损失函数
+针对PCB焊点多为圆形、集中于焊盘区域的特性，设计了**面积‑形状‑区域三维复合权重**：
+- **形状权重**：基于圆形度C筛选类圆形目标，突出焊点形状特征。
+- **区域权重**：利用焊盘掩膜判定目标中心是否位于焊盘内，赋予核心区域更高损失权重。
+- **面积权重**：对小目标（像素面积<256）自动提升权重，结合困难样本（小目标+低IoU）额外加权。
 
-#### 2、添加小目标检测头；
-新增检测4X4以上目标的检测头，提高对小目标的检测能力
-![image](https://github.com/Zwc2003/YOLOv8-model-improvement/assets/126054446/8c71bdcf-2688-4e47-86c3-4f43e4b04e86)
-
-
-#### 3、替换为Wise_IoU损失函数
-本项目中已将YOLOv8内置的CIoU替换为Wise-IoU
+最终加权损失函数作用于边界框回归、分类及蒸馏损失，有效缓解训练过程中大小目标优化不平衡问题。
 
 ### 实验数据集
-yolo格式的人体头部数据集(主要由教室等场所的摄像头拍摄获得)
-
-train:3475
-
-val:868
-
-### 历次有效提升的实验结果
-
-![image](https://github.com/Zwc2003/YOLOv8-model-improvement/assets/126054446/76f631ab-e49f-403f-b59d-c9ca851945b8)
-
-### 注意！！！
-1、项目中保留有其他修改实验的配置文件，如添加其他注意力机制的YAML文件，单独添加小目标检测头的YAML文件，可根据需要进行训练
-
-2、需要注意的是，本项目使用的边界盒回归损失函数已经修改为Wise-IoU
-
-3、本项目存放有使用头部数据集训练的改进版模型，并进行模型加速，结果存放于`runs/detect/best-model/weigths`中，分别是best.pt、best.onnx、best.engine(仅支持GPU)
-
-  
-### 完整web端展示界面
-web端由Vue和Flask开发，基于目标跟踪实现了两个应用场景的简单功能，两种跟踪器可选（botsort,bytetrack）
-
-![image](https://github.com/Zwc2003/YOLOv8-model-improvement/assets/126054446/7950eb32-a778-4768-b3fa-c607c011f7d6)
+PCB焊点数据集
 
 
-
-#### 球员运动轨迹分析
-展示每个目标的运动轨迹及速度和加速度
-
-不同目标的轨迹颜色不同
-
-便于赛后复盘比赛和分析战术
-#### 逆行检测
-检测目标的行进方向是否符合预先设定好的正确方向
-
-在每个逆行目标位置标注其id和轨迹
-
-在视频的左上角集中地展示所有逆行的id
-## 启动前后端交互系统
-### 启动后端
-打开后端项目文件夹
-
-在`app.py`中指定ip地址和监听端口，需与前端一致，详情见下方前端的[配置代理服务](#配置代理服务)
-```
-if __name__ == '__main__':
-    socketio.run(app, host="localhost", debug=True, port=5000, allow_unsafe_werkzeug=True)
-```
-#### 修改推理使用模型
-如果想用其他模型进行推理，请在`functions`下的三个py文件中修改加载模型的路径：
-
-```
-# Load the model
-    model = YOLO('./runs/detect/best-model/weights/best.onnx')
-```
-
-在当前目录下终端运行`python app.py`即可启动后端服务
-
-### 启动前端
-打开前端项目文件夹
 #### 运行环境
 
-Vue 2.x.x
+本实验深度学习框架为pytorch，采用Windows11操作系统，处理器为Intel(R) Core(TM) i5-8400 CPU，GPU为Nvidia GeForce RTX 3090，采用的算法基础模型为yolov8m，设置的具体实验参数为：迭代次数300次，输入的图片尺寸为640pixel×640pixel，batchsize是32。
+### 与主流算法对比
 
-Node >= 6.0.0
 
-Npm >= 3.0.0
-#### 在当前目录下运行以下命令进行启动
-```
-# install dependencies
-npm install
+YOLO-CH在所有指标上全面超越当前主流检测器，尤其在小目标（焊点）检测上优势明显
 
-# serve with hot reload at localhost:8080
-npm run dev
-
-# build for production with minification
-npm run build
-
-# build for production and view the bundle analyzer report
-npm run build --report
-```
-#### 配置代理服务
-需在config/index.js中进行配置，在配置完成后请重新启动项目方可生效
-```
-proxyTable: {
-  '/api' : {
-    // target需更换为后端实际局域网内IP，目前仅支持同一网段下的服务,端口(5000)也需和后端监听的端口一致
-    target: 'http://localhost:5000',
-    ws: true,
-    secure: false,
-    changeOrigin: true,
-    pathRewrite: {
-      '^/api': ''
-    }
-  }
-},
-```
 ## 如何训练自己的数据集
 请在后端项目文件中进行以下操作
 ### 配置环境
@@ -156,7 +75,7 @@ proxyTable: {
 ### 修改配置文件
 1、配置文件基本都在`ultralytics/cfg`的路径下
 
-2、在`ultralytics/cfg/datasets`下设置datasets的路径,项目文件中已有demo.yaml,如果在上面的`准备数据集`的环节中你已经严格按照要求进行,那么demo.yaml的内容几乎不需要修改,若你的数据集放在了其他路径,请复制一份demo.yaml进行修改,根据真实路径模仿下列格式进行修改即可:
+2、在`ultralytics/cfg/datasets`下设置datasets的路径,项目文件中已有pcb.yaml,如果在上面的`准备数据集`的环节中你已经严格按照要求进行,那么pcb.yaml的内容几乎不需要修改,若你的数据集放在了其他路径,请复制一份pcb.yaml进行修改,根据真实路径模仿下列格式进行修改即可:
 ```
 path: ../datasets/  # dataset root dir
 train: images/train  # train images
@@ -171,29 +90,6 @@ name:
 ```
 ### 调参
 模型的参数调整集中在了`ultralytics/cfg/default.yaml`的文件中，请根据需要进行调整，其中前两个参数`model`和`data`不需要填写
-### 开始训练
-打开项目根目录下的`start_train.py`
-
-内容如下：
-```
-from ultralytics import YOLO
-
-# Load a model
-#1、 model = YOLO('yolov8n.yaml')  # build a new model from YAML
-#2、 model = YOLO('yolov8n.pt')  # load a pretrained model (recommended for training)
-model = YOLO('path/to/the/YAML').load(
-             'path/to/the/pre_trained/weights')  # build from YAML and transfer weights
-
-# Train the model
-model.train(data='path/to/the/YAML/of/datasets')
-```
-提供了三种训练模式：(1)从头开始训练一个模型；(2)直接用预训练模型训练自己的数据集；(3)加载预训练权重，用修改后的yaml文件训练自己的数据集
-
-如果没有修改模型，只是想用YOLOv8训练自己的数据集，那么请使用第2种，不建议用第1种，采用预训练模型可以加快收敛速度，而且效果比较好
-
-如果修改了模型，那么请使用第3种，因为一般对模型的修改需要在yaml文件中重新声明模型的结构，一方面通过加载预训练模型来加快收敛提高效果，一方面需要引入修改后的模型的yaml文件
-
-接下来只需要在对应的位置填写`预训练权重/模型的yaml文件/数据集的yaml文件`的路径即可
 
 ### 注意
 注意`\`和`/`的区别
@@ -204,7 +100,7 @@ model.train(data='path/to/the/YAML/of/datasets')
 
 若需要使用GPU进行训练，请在`default.yaml`中指定`device`参数
 
-### 运行start_train.py文件即可开始训练！
+### 运行trainp.py文件即可开始训练！
 
 
 
