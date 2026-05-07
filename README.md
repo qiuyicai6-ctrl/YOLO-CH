@@ -1,4 +1,4 @@
-# YOLOv8-model-improvement
+# YOLO-CH
 ## 目录
 - [项目基本介绍](#项目基本介绍)
 - [YOLO-CH核心改进](#yolo-ch核心改进)
